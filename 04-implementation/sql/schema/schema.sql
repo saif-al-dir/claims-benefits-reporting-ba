@@ -68,7 +68,7 @@ CREATE TABLE dim_handler (
     handler_id       VARCHAR(10) NOT NULL UNIQUE,
     team             VARCHAR(20) NOT NULL,
     experience_level VARCHAR(12) NOT NULL
-        CHECK (experience_level IN ('Junior', 'Intermediate', 'Senior'))
+        CHECK (experience_level IN ('Junior', 'Intermediate', 'Senior', 'N/A'))
 );
 
 -- Fixes as-is pain point: no standard claim status model -> KPIs not comparable.

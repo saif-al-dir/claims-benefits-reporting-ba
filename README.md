@@ -138,4 +138,10 @@ PostgreSQL · GitHub Actions · GitHub Pages · Mermaid / BPMN · Chart.js
 
 
 Quick Start
-Setup instructions coming in Step 2.
+
+Requires a PostgreSQL 14+ database (e.g. a free Neon project). Run each scriptas a single batch in one session:
+
+Schema — 04-implementation/sql/schema/schema.sql
+Source data — 04-implementation/sql/data/generate_source_data.sql(simulates a legacy claims extract: ~149,000 claims, reproducible via seed)
+ETL — 04-implementation/sql/data/etl_load.sql(validation, deduplication, code mappings; rejections logged to dq_audit_log)
+All data is synthetic (GDPR-safe).
