@@ -1,11 +1,8 @@
-🏥 Insurance Claims & Benefits — Business Analysis to Reporting Solution
+# Logical Data Model — Claims & Benefits Star Schema
 
+SQL implementation: [`04-implementation/sql/schema/schema.sql`](../04-implementation/sql/schema/schema.sql)
 
-End-to-end business analysis project: from business requirements analysis andBPMN process modeling, through functional specification and data warehousedesign, to a tested and automatically deployed KPI reporting solution.
-
-⚠️ Fictional case study ("NovaCare Insurance"). All data is synthetic — GDPR-safe.
-
-## Data Model
+## Entity-Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -108,34 +105,23 @@ erDiagram
     DIM_DATE     ||--o{ FCT_CLAIM_STATUS_SNAPSHOT : "snapshot date"
 ```
 
+## Grain Statements
 
-Business Case
+| Table | Grain |
+|---|---|
+| `fct_claim` | One row per claim (latest lifecycle state) |
+| `fct_payment` | One row per payment transaction |
+| `fct_claim_status_snapshot` | One row per open claim per day |
 
-A mid-size insurer processes claims across 3 legacy systems. Monthly reportingcosts 5 person-days, claim aging is invisible, and the regulator requires proofof claim-decision turnaround times. This project delivers the full analysis anddesign, plus a working, CI-tested implementation.
+## Key Design Decisions
 
-Objective	Target
-Reporting effort	5 days → < 0.5 days (automation)
-Backlog transparency	Daily aging dashboard
-Claim cycle time	−20% within 12 months
-Regulatory TAT evidence	100% traceable decisions
-Payment accuracy	Paid ≤ approved, violations flagged
-
-
-Deliverables
- Business Requirements Document (BRD) with prioritized requirements
- As-Is / To-Be process models (BPMN)
- Functional specification for the reporting solution
- KPI catalog & report specifications
- Logical data model (star schema)
- Source-to-target mapping & data quality rules
- SQL implementation: schema, seeded test data, DQ tests, KPI queries
- CI pipeline (GitHub Actions) — every push is automatically tested
- Live dashboard (GitHub Pages)
-
-
-Tech Stack
-PostgreSQL · GitHub Actions · GitHub Pages · Mermaid / BPMN · Chart.js
-
-
-Quick Start
-Setup instructions coming in Step 2.
+| # | Decision | Rationale |
+|---|---|---|
+| 1 | Star schema with surrogate keys (`GENERATED ALWAYS AS IDENTITY`) | Decouples warehouse from legacy business keys; insulates against source key changes |
+| 2 | No `paid_amount` in `fct_claim` | Payments live at transaction grain in `fct_payment`; total paid = `SUM()`. Payment accuracy (KPI-06) becomes a real cross-fact reconciliation check |
+| 3 | `sla_days` in `dim_policy`, `sla_met` in `fct_claim` | SLA is a product attribute (dimension); compliance is determined at decision time (fact) |
+| 4 | Daily status snapshot fact | Enables backlog/aging trend analysis — impossible with the current monthly Excel reports (OBJ-2) |
+| 5 | `dq_audit_log` | Persistent evidence of data quality checks; implements the rejection log required by FR-03 |
+| 6 | Smart date key `YYYYMMDD` | Human-readable, sortable, join-friendly conformed dimension |
+| 7 | `dim_claim.current_status` as Type 1 attribute | Overwritten on change; history preserved in the snapshot fact |
+| 8 | Status catalogue enforced by `CHECK` constraints | Directly fixes as-is pain point "no standard status codes → KPIs not comparable" |
