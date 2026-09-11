@@ -1,0 +1,48 @@
+name: CI — Data Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  data-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Ephemeral PostgreSQL — fresh database on every run, thrown away after
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create star schema (tables, constraints, dim_date)
+        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/schema/schema.sql
+
+      - name: Generate synthetic source + run ETL (self-verifying)
+        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/data/run_full_load.sql
+
+      - name: Run DQ test suite (24 assertions)
+        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/tests/dq_test_suite.sql
