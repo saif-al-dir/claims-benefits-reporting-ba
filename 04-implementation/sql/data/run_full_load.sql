@@ -1,8 +1,18 @@
 -- ============================================================================
 -- NovaCare Insurance — Claims & Benefits Reporting Solution
--- File:    04-implementation/sql/data/run_full_load.sql   (FULL-LOAD v1.0)
+-- File:    04-implementation/sql/data/run_full_load.sql   (FULL-LOAD v1.1)
 -- Purpose: One-shot rebuild: synthetic legacy source + ETL + self-verification.
---          This is the same entry point the CI pipeline (GitHub Actions) uses.
+--          Same entry point the CI pipeline (GitHub Actions) will use.
+--
+-- v1.1 ROOT-CAUSE FIX:
+--   random() inside an UNCORRELATED subquery in FROM is evaluated ONCE for
+--   the whole query (the subquery is an independent derived table; LATERAL
+--   alone does not force per-row evaluation when no outer column is
+--   referenced). v1.0 therefore drew ONE value per query for LOB, SLA,
+--   status, amounts and corruption -> degenerate data: all-Health claims,
+--   100% SLA compliance, zero corruption.
+--   Fix: every random-draw subquery now correlates to its driving row
+--   (WHERE <outer>.<key> IS NOT NULL), forcing per-row evaluation.
 --
 -- READING THE OUTPUT: a banner '<n>/14: ...' prints after every section.
 --   Last banner seen          = how far execution got
@@ -12,7 +22,7 @@
 -- All data is synthetic — GDPR-safe.
 -- ============================================================================
 
-SELECT '1/14: FULL-LOAD v1.0 starts — destroying all old data' AS step;
+SELECT '1/14: FULL-LOAD v1.1 starts — destroying all old data' AS step;
 
 -- ── Reset ──────────────────────────────────────────────────────────────────
 SELECT setseed(0.42);
@@ -50,7 +60,7 @@ INSERT INTO dim_benefit (benefit_type, payment_form) VALUES
     ('Disability Lump Sum',         'One-time');
 SELECT '2/14: benefits loaded=' || COUNT(*)::text AS step FROM dim_benefit;
 
--- ── Handlers (55 + H999 UNKNOWN) ───────────────────────────────────────────
+-- ── Handlers (55 in 4 teams + H999 UNKNOWN) ───────────────────────────────
 INSERT INTO dim_handler (handler_id, team, experience_level)
 SELECT 'H' || lpad(g::text, 3, '0'),
        CASE WHEN g <= 20 THEN 'Team Alpha'
@@ -61,7 +71,8 @@ SELECT 'H' || lpad(g::text, 3, '0'),
             WHEN x.r < 0.70 THEN 'Intermediate'
             ELSE 'Senior' END
 FROM generate_series(1, 55) AS g
-CROSS JOIN LATERAL (SELECT random() AS r) AS x;
+CROSS JOIN LATERAL (SELECT random() AS r
+                    WHERE g IS NOT NULL) AS x;              -- v1.1: correlated
 INSERT INTO dim_handler (handler_id, team, experience_level)
 VALUES ('H999', 'Unassigned', 'N/A');
 SELECT '3/14: handlers loaded=' || COUNT(*)::text AS step FROM dim_handler;
@@ -77,7 +88,8 @@ SELECT 'POL-' || lpad(g::text, 5, '0'),
                 DATE '2025-12-31'),
        pr.sla_days
 FROM generate_series(1, 10000) AS g
-CROSS JOIN LATERAL (SELECT random() AS rw) AS rr
+CROSS JOIN LATERAL (SELECT random() AS rw
+                    WHERE g IS NOT NULL) AS rr              -- v1.1: correlated
 JOIN LATERAL (
     SELECT product, line_of_business, sla_days
     FROM (VALUES
@@ -95,7 +107,8 @@ JOIN LATERAL (
 ) AS pr ON TRUE
 CROSS JOIN LATERAL (SELECT (DATE '2015-01-01'
                             + floor(random() * 2000)::int)::date
-                    AS coverage_start) AS cs;
+                    AS coverage_start
+                    WHERE g IS NOT NULL) AS cs;             -- v1.1: correlated
 SELECT '4/14: policies loaded=' || COUNT(*)::text AS step FROM dim_policy;
 
 -- ── Claimants ──────────────────────────────────────────────────────────────
@@ -112,7 +125,8 @@ SELECT 'CLT-' || lpad(g::text, 5, '0'),
             WHEN x.r3 < 0.93 THEN 'Gold'
             ELSE 'Platinum' END
 FROM generate_series(1, 40000) AS g
-CROSS JOIN LATERAL (SELECT random() AS r1, random() AS r2, random() AS r3) AS x;
+CROSS JOIN LATERAL (SELECT random() AS r1, random() AS r2, random() AS r3
+                    WHERE g IS NOT NULL) AS x;              -- v1.1: correlated
 SELECT '5/14: claimants loaded=' || COUNT(*)::text AS step FROM dim_claimant;
 
 -- ── Daily volumes + lookup arrays ──────────────────────────────────────────
@@ -142,6 +156,9 @@ SELECT '6/14: daily volumes built, days=' || COUNT(*)::text AS step
 FROM tmp_daily_volume;
 
 -- ── Canonical claim universe — THE STORY ENGINE ────────────────────────────
+-- v1.1: x, pp and cc are now CORRELATED to the claim row (s.seq), so every
+-- claim draws its own random values. This is what restores the LOB mix,
+-- the SLA breach model, varied amounts, channels and statuses.
 CREATE TEMP TABLE tmp_claims_canonical AS
 SELECT
     'CLM-' || to_char(v.fnol_date, 'YYYY') || '-' ||
@@ -188,18 +205,21 @@ CROSS JOIN LATERAL (SELECT random() AS r_lob,  random() AS r_chan,
                            random() AS r_status, random() AS r_sla,
                            random() AS r_cycle, random() AS r_reason,
                            random() AS r_reopen, random() AS r_amt,
-                           random() AS r_appr,  random() AS r_close) AS x
+                           random() AS r_appr,  random() AS r_close
+                    WHERE s.seq IS NOT NULL) AS x            -- v1.1: correlated
 CROSS JOIN LATERAL (SELECT CASE WHEN x.r_lob < 0.60 THEN 'Health'
                                 WHEN x.r_lob < 0.85 THEN 'Accident'
                                 ELSE 'Disability' END AS lob,
                            EXTRACT(YEAR FROM v.fnol_date)::int AS yr) AS l
 JOIN tmp_pol_by_lob p ON p.line_of_business = l.lob
 CROSS JOIN LATERAL (SELECT p.pol_ids[1 + floor(random()
-                    * array_length(p.pol_ids, 1))::int] AS policy_id) AS pp
+                    * array_length(p.pol_ids, 1))::int] AS policy_id
+                    WHERE s.seq IS NOT NULL) AS pp           -- v1.1: correlated
 JOIN dim_policy dp ON dp.policy_id = pp.policy_id
 CROSS JOIN tmp_claimants tc
 CROSS JOIN LATERAL (SELECT tc.clt_ids[1 + floor(random()
-                    * array_length(tc.clt_ids, 1))::int] AS claimant_id) AS cc
+                    * array_length(tc.clt_ids, 1))::int] AS claimant_id
+                    WHERE s.seq IS NOT NULL) AS cc           -- v1.1: correlated
 CROSS JOIN LATERAL (
     SELECT CASE l.lob
         WHEN 'Health'   THEN CASE l.yr WHEN 2022 THEN 0.900
@@ -266,7 +286,7 @@ SELECT '7/14: canonical built: total=' || COUNT(*)::text
        || ' | Health=' || COUNT(*) FILTER (WHERE lob = 'Health')::text
        || ' Accident=' || COUNT(*) FILTER (WHERE lob = 'Accident')::text
        || ' Disability=' || COUNT(*) FILTER (WHERE lob = 'Disability')::text
-       || ' (expect ~149,386 | ~89,600 | ~37,300 | ~22,400)' AS step
+       || ' (expect ~149,346 | ~89,600 | ~37,300 | ~22,400)' AS step
 FROM tmp_claims_canonical;
 
 -- ── Legacy "export" WITH controlled corruption ─────────────────────────────
@@ -307,7 +327,8 @@ SELECT
     (c.approved_amount * 100)::BIGINT
 FROM tmp_claims_canonical c
 CROSS JOIN LATERAL (SELECT random() AS r_b1, random() AS r_b2, random() AS r_b3,
-                           random() AS r_b4, random() AS r_b5) AS dg;
+                           random() AS r_b4, random() AS r_b5
+                    WHERE c.claim_id IS NOT NULL) AS dg;    -- v1.1: correlated
 
 SELECT '8/14: legacy export: rows=' || COUNT(*)::text
        || ' | bad FNOL dates=' || COUNT(*) FILTER (
@@ -316,7 +337,7 @@ SELECT '8/14: legacy export: rows=' || COUNT(*)::text
        || ' | unknown handlers=' || (SELECT COUNT(*) FROM stg_raw_claims s
              WHERE UPPER(TRIM(s.handl)) NOT IN
                    (SELECT handler_id FROM dim_handler))::text
-       || ' (expect ~149,386 | ~25-35 | ~220)' AS step
+       || ' (expect ~149,346 | ~25-35 | ~220)' AS step
 FROM stg_raw_claims;
 
 -- ── Inject 40 exact duplicates ─────────────────────────────────────────────
@@ -332,12 +353,11 @@ LIMIT 40 OFFSET 60000;
 DROP TABLE IF EXISTS tmp_daily_volume, tmp_pol_by_lob, tmp_claimants,
                         tmp_claims_canonical;
 SELECT '9/14: duplicates injected, source final rows=' || COUNT(*)::text
-       || ' (expect ~149,426)' AS step
+       || ' (expect ~149,386)' AS step
 FROM stg_raw_claims;
 
 -- ═════════════════════ ETL ════════════════════════════════════════════════
 
-SELECT '10/14: ETL starts' AS step;
 SELECT setseed(0.77);
 
 CREATE OR REPLACE FUNCTION fn_safe_to_date(p_raw TEXT)
@@ -473,10 +493,10 @@ JOIN dim_date     dfn   ON dfn.full_date   = e.fnol_date
 LEFT JOIN dim_date dcd  ON dcd.full_date   = e.decision_date
 LEFT JOIN dim_date dcl  ON dcl.full_date   = e.close_date;
 
-SELECT '10/14: claims loaded=' || COUNT(*)::text
+SELECT '10/14: ETL claims loaded=' || COUNT(*)::text
        || ' | critical rejected=' || (SELECT COUNT(*) FROM dq_audit_log
              WHERE severity = 'Critical')::text
-       || ' (expect ~149,340 | ~40)' AS step
+       || ' (expect ~149,300 | ~40-50)' AS step
 FROM fct_claim;
 
 -- ── Payments (one-time + recurring installments) ───────────────────────────
@@ -557,7 +577,7 @@ JOIN dim_date d1 ON d1.date_key = fp.payment_date_key
 JOIN dim_date d2 ON d2.full_date = LEAST(d1.full_date + 14, DATE '2024-12-31');
 
 SELECT '11/14: payments=' || COUNT(*)::text
-       || ' (expect ~165,000-195,000 — recurring benefits included)' AS step
+       || ' (expect ~160,000-190,000 — recurring benefits included)' AS step
 FROM fct_payment;
 
 -- ── Status snapshots (backlog/aging history) ───────────────────────────────
@@ -583,7 +603,7 @@ JOIN dim_claim dc ON dc.claim_id = e.clm_id;
 
 DROP TABLE IF EXISTS tmp_etl_claims, tmp_leak_dup, tmp_leak_reissue;
 SELECT '12/14: snapshots=' || COUNT(*)::text
-       || ' (expect ~500,000-800,000)' AS step
+       || ' (expect several hundred thousand)' AS step
 FROM fct_claim_status_snapshot;
 
 -- ═══════════════ SELF-VERIFICATION ════════════════════════════════════════
@@ -601,7 +621,7 @@ SELECT '13/14: LINEAGE IDENTITY: ' ||
 SELECT '14/14: FULL-LOAD COMPLETE — results follow, copy them into your reply'
        AS step;
 
--- Result 1: DQ audit summary (expect E1 Critical ~40, E2 Warning 40, E3 Warning ~220)
+-- Result 1: DQ audit summary (expect E1 Critical ~40-50, E2 Warning 40, E3 Warning ~220)
 SELECT check_name, severity, COUNT(*) AS violations
 FROM dq_audit_log
 GROUP BY check_name, severity
@@ -625,4 +645,4 @@ JOIN (SELECT claim_sk, SUM(payment_amount) AS paid
 WHERE fc.approved_benefit_amount IS NOT NULL
   AND pay.paid > fc.approved_benefit_amount;
 
--- [FULL-LOAD v1.0 — END OF FILE]
+-- [FULL-LOAD v1.1 — END OF FILE]
