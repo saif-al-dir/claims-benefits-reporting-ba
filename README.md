@@ -139,9 +139,7 @@ PostgreSQL · GitHub Actions · GitHub Pages · Mermaid / BPMN · Chart.js
 
 Quick Start
 
-Requires a PostgreSQL 14+ database (e.g. a free Neon project). Run each scriptas a single batch in one session:
+Requires PostgreSQL 14+ (e.g. a free Neon project) and psql.
 
-Schema — 04-implementation/sql/schema/schema.sql
-Source data — 04-implementation/sql/data/generate_source_data.sql(simulates a legacy claims extract: ~149,000 claims, reproducible via seed)
-ETL — 04-implementation/sql/data/etl_load.sql(validation, deduplication, code mappings; rejections logged to dq_audit_log)
-All data is synthetic (GDPR-safe).
+export DB_URL='postgresql://user:password@host/dbname?sslmode=require'# 1. Create the schema (tables, constraints, indexes, dim_date)psql "$DB_URL" -f 04-implementation/sql/schema/schema.sql# 2. Generate the synthetic legacy source + run the ETL (self-verifying, ~3 min)psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/data/run_full_load.sql# 3. Run the automated DQ test suite (24 assertions, CI-compatible)psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/tests/dq_test_suite.sql
+All data is synthetic and reproducible (seeded random) — GDPR-safe.
