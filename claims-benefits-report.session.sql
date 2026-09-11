@@ -68,7 +68,7 @@ CREATE TABLE dim_handler (
     handler_id       VARCHAR(10) NOT NULL UNIQUE,
     team             VARCHAR(20) NOT NULL,
     experience_level VARCHAR(12) NOT NULL
-        CHECK (experience_level IN ('Junior', 'Intermediate', 'Senior', 'N/A'))
+        CHECK (experience_level IN ('Junior', 'Intermediate', 'Senior', 'N/A')),
 );
 
 -- Fixes as-is pain point: no standard claim status model -> KPIs not comparable.
@@ -83,7 +83,7 @@ CREATE TABLE dim_claim (
     claim_reason     VARCHAR(40) NOT NULL,
     current_status   VARCHAR(15) NOT NULL
         CHECK (current_status IN ('Registered', 'In Assessment', 'Decided',
-                                'Closed', 'Rejected')),
+                                   'Closed', 'Rejected')),
     reopen_count     INT NOT NULL DEFAULT 0 CHECK (reopen_count >= 0)
 );
 

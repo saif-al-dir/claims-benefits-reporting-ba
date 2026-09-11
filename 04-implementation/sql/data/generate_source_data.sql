@@ -1,26 +1,22 @@
 -- ============================================================================
 -- NovaCare Insurance — Claims & Benefits Reporting Solution
--- File:    04-implementation/sql/data/generate_source_data.sql
--- Purpose: Generates reproducible SYNTHETIC test data.
---          Part 1: reference dimensions (except dim_date / dim_claim)
---          Part 2: stg_raw_claims — simulated LEGACY extract ("dirty" source)
+-- File:    04-implementation/sql/data/generate_source_data.sql  (v2)
+-- Purpose: Reproducible SYNTHETIC test data.
 --
--- Run as ONE batch in a single session (required for seed reproducibility).
--- Expected runtime: ~30-60 seconds.
+-- Run as ONE batch in a single session. Expected runtime: ~30-60 seconds.
 -- All data is fictional — no real customer data (GDPR-safe).
 -- ============================================================================
 
+-- ═══════════ SECTION 0 OF 8: Reset ═══════════
 SELECT setseed(0.42);   -- master seed: same seed + same script = same data
 
--- 0. Reset (idempotent re-run). dim_date is untouched (loaded by schema.sql).
---    CASCADE also clears all fact tables referencing these dimensions.
 TRUNCATE dim_benefit, dim_handler, dim_policy, dim_claimant,
          dim_claim, dq_audit_log RESTART IDENTITY CASCADE;
 
 DROP TABLE IF EXISTS stg_raw_claims;
 CREATE TABLE stg_raw_claims (
     clm_id        VARCHAR(20),
-    clm_stat      VARCHAR(2),   -- legacy status code (mapping in ETL)
+    clm_stat      VARCHAR(2),   -- legacy status code (mapped in ETL)
     clm_dat_fnol  VARCHAR(10),  -- 'DD.MM.YYYY' — sometimes corrupted
     clm_dat_dec   VARCHAR(10),
     clm_dat_close VARCHAR(10),
@@ -34,7 +30,7 @@ CREATE TABLE stg_raw_claims (
     apprd_amt     BIGINT        -- approved amount in CENTS, NULL = pending
 );
 
--- 1. Benefit catalogue (fixed reference data)
+-- ═══════════ SECTION 1 OF 8: Benefit catalogue ═══════════
 INSERT INTO dim_benefit (benefit_type, payment_form) VALUES
     ('Hospital Daily Allowance',    'One-time'),
     ('Outpatient Reimbursement',    'One-time'),
@@ -46,7 +42,7 @@ INSERT INTO dim_benefit (benefit_type, payment_form) VALUES
     ('Disability Income Monthly',   'Recurring'),
     ('Disability Lump Sum',         'One-time');
 
--- 2. Handlers: 55 in 4 teams + 1 UNKNOWN member (target of mapping rule E3)
+-- ═══════════ SECTION 2 OF 8: Handlers (55 in 4 teams + H999 UNKNOWN) ═══════════
 INSERT INTO dim_handler (handler_id, team, experience_level)
 SELECT
     'H' || lpad(g::text, 3, '0'),
@@ -63,7 +59,7 @@ CROSS JOIN LATERAL (SELECT random() AS r) AS x;
 INSERT INTO dim_handler (handler_id, team, experience_level)
 VALUES ('H999', 'Unassigned', 'N/A');
 
--- 3. Policies: 10,000, weighted product mix, product-specific SLA days
+-- ═══════════ SECTION 3 OF 8: Policies (10,000, weighted mix, SLA by product) ═══════════
 INSERT INTO dim_policy (policy_id, product, line_of_business,
                         coverage_start, coverage_end, sla_days)
 SELECT
@@ -95,7 +91,7 @@ CROSS JOIN LATERAL (SELECT (DATE '2015-01-01'
                             + floor(random() * 2000)::int)::date
                     AS coverage_start) AS cs;
 
--- 4. Claimants: 40,000 pseudonymized (GDPR)
+-- ═══════════ SECTION 4 OF 8: Claimants (40,000, pseudonymized) ═══════════
 INSERT INTO dim_claimant (claimant_id, age_band, region, customer_segment)
 SELECT
     'CLT-' || lpad(g::text, 5, '0'),
@@ -112,8 +108,7 @@ SELECT
 FROM generate_series(1, 40000) AS g
 CROSS JOIN LATERAL (SELECT random() AS r1, random() AS r2, random() AS r3) AS x;
 
--- 5. Daily claim volume 2022-2024 (~149,000 claims):
---    winter peak, summer accident bump, +12%/+25% year-over-year growth
+-- ═══════════ SECTION 5 OF 8: Daily volumes + lookup arrays ═══════════
 CREATE TEMP TABLE tmp_daily_volume AS
 SELECT
     d::date AS fnol_date,
@@ -130,7 +125,6 @@ SELECT
     )::numeric)::int) AS n_claims
 FROM generate_series(DATE '2022-01-01', DATE '2024-12-31', INTERVAL '1 day') AS d;
 
--- Fast lookup arrays for random FK assignment
 CREATE TEMP TABLE tmp_pol_by_lob AS
 SELECT line_of_business, array_agg(policy_id ORDER BY policy_id) AS pol_ids
 FROM dim_policy GROUP BY line_of_business;
@@ -139,12 +133,12 @@ CREATE TEMP TABLE tmp_claimants AS
 SELECT array_agg(claimant_id ORDER BY claimant_id) AS clt_ids
 FROM dim_claimant;
 
--- 6. Canonical claim universe — the "business reality" behind the data.
---    Embedded patterns the analysis will later discover:
---      * portal adoption grows 25% -> 55% (digitalization trend)
---      * SLA compliance: Health improves 90->95.5%; Disability stuck ~74-78%
---      * ~5.8% of closed claims are reopened (first-pass target is 85%)
---      * a small share of old claims is stuck open -> 180+ day backlog
+-- ═══════════ SECTION 6 OF 8: Canonical claim universe — THE STORY ENGINE ═══════════
+-- Embedded patterns the analysis will discover:
+--   * LOB mix: Health 60% / Accident 25% / Disability 15%
+--   * Portal adoption grows 25% -> 55% (digitalization trend)
+--   * SLA compliance: Health improves 90->95.5%; Disability stuck ~74-78%
+--   * ~5.8% of closed claims reopen; ~8% of old claims rejected
 CREATE TEMP TABLE tmp_claims_canonical AS
 SELECT
     'CLM-' || to_char(v.fnol_date, 'YYYY') || '-' ||
@@ -265,11 +259,10 @@ CROSS JOIN LATERAL (           -- approval ratio 55-100%, reopens
                           ELSE 0 END
                 ELSE 0 END AS reopen_count) AS o4;
 
--- 7. "Export" the canonical universe into the LEGACY extract format,
---    including controlled corruption for the DQ gates to catch:
---      ~0.02% invalid FNOL date strings  -> Critical rejection (E1)
---      ~0.01% decision date before FNOL  -> Critical rejection (E1)
---      ~0.15% non-existent handler codes -> Warning, defaulted to H999 (E3)
+-- ═══════════ SECTION 7 OF 8: Legacy "export" WITH CONTROLLED CORRUPTION ═══════════
+--   ~0.02% invalid FNOL date strings  -> Critical rejection (E1)
+--   ~0.01% decision date before FNOL  -> Critical rejection (E1)
+--   ~0.15% non-existent handler codes -> Warning, defaulted to H999 (E3)
 INSERT INTO stg_raw_claims (clm_id, clm_stat, clm_dat_fnol, clm_dat_dec,
                             clm_dat_close, pol_id, clmt_id, handl, chanl,
                             clm_reason, rwn_cnt, clamd_amt, apprd_amt)
@@ -309,7 +302,7 @@ FROM tmp_claims_canonical c
 CROSS JOIN LATERAL (SELECT random() AS r_b1, random() AS r_b2, random() AS r_b3,
                            random() AS r_b4, random() AS r_b5) AS dg;
 
--- 8. Inject ~40 exact duplicate rows (deduplication check E2)
+-- ═══════════ SECTION 8 OF 8: Inject 40 exact duplicate rows (dedup check E2) ═══════════
 INSERT INTO stg_raw_claims (clm_id, clm_stat, clm_dat_fnol, clm_dat_dec,
                             clm_dat_close, pol_id, clmt_id, handl, chanl,
                             clm_reason, rwn_cnt, clamd_amt, apprd_amt)
@@ -321,3 +314,5 @@ LIMIT 40 OFFSET 60000;
 
 DROP TABLE IF EXISTS tmp_daily_volume, tmp_pol_by_lob, tmp_claimants,
                         tmp_claims_canonical;
+
+-- ═══════════ [END OF FILE — generate_source_data.sql v2 — 8 sections complete] ═══════════
