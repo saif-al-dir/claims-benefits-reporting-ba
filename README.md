@@ -1,6 +1,8 @@
 # 🏥 Insurance Claims & Benefits — Business Analysis to Reporting Solution
 
-badge visible on your README
+CI — Data Pipeline | passing ✅
+
+- [x] CI pipeline (GitHub Actions) — every push is automatically tested
 
 End-to-end business analysis project: from business requirements analysis andBPMN process modeling, through functional specification and data warehousedesign, to a tested and automatically deployed KPI reporting solution.
 
