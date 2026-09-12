@@ -2,9 +2,49 @@
 
 [![CI — Data Pipeline](https://github.com/saif-al-dir/claims-benefits-reporting-ba/actions/workflows/ci.yml/badge.svg)](https://github.com/saif-al-dir/claims-benefits-reporting-ba/actions/workflows/ci.yml)
 
-End-to-end business analysis project: from business requirements analysis andBPMN process modeling, through functional specification and data warehousedesign, to a tested and automatically deployed KPI reporting solution.
+End-to-end business analysis project: from business requirements analysis and BPMN process modeling, through functional specification and data warehouse design, to a **tested and CI-verified KPI reporting solution**.
 
-⚠️ Fictional case study ("NovaCare Insurance"). All data is synthetic — GDPR-safe.
+> ⚠️ Fictional case study ("NovaCare Insurance"). All data is synthetic and reproducible (seeded) — GDPR-safe.
+
+## 📖 The Story in the Data
+
+Three years of synthetic claims data (~149,000 claims, 2022–2024) were generated with embedded, realistic business problems that the analysis uncovers:
+
+- **Disability claims are stuck:** SLA compliance has hovered at ~77% for three straight years (77.3 → 76.4 → 77.5), while Health improved from 90.4% to 95.3% and Accident holds stable at ~95%. The operations improvement program works everywhere except Disability.
+- **Payment leakage exists:** ≈340 claims were paid more than the approved benefit amount (duplicate payments + erroneous re-issues) — every one flagged by automated reconciliation (KPI-06).
+- **Data quality gates work:** the ETL rejected 45 critical rows (invalid dates, decision-before-FNOL), removed 40 exact duplicates, and defaulted 261 unknown handler codes to an explicit UNKNOWN member — each rejection logged with evidence.
+- **Digital intake is growing:** portal adoption rose from 25% to 55% of new claims across the period.
+
+## Business Case
+
+A mid-size insurer processes claims across 3 legacy systems. Monthly reporting costs 5 person-days, claim aging is invisible, and the regulator requires proof of claim-decision turnaround times. This project delivers the full analysis and design, plus a working, CI-tested implementation.
+
+| Objective | Target |
+|---|---|
+| Reporting effort | 5 days → < 0.5 days (automation) |
+| Backlog transparency | Daily aging dashboard |
+| Claim cycle time | −20% within 12 months |
+| Regulatory TAT evidence | 100% traceable decisions |
+| Payment accuracy | Paid ≤ approved, violations flagged |
+
+## Deliverables
+
+- [ ] Business Requirements Document (BRD) with prioritized requirements
+- [ ] As-Is / To-Be process models (BPMN)
+- [ ] Functional specification for the reporting solution
+- [ ] KPI catalog & report specifications
+- [x] Logical data model (star schema)
+- [ ] Source-to-target mapping & data quality rules
+- [x] SQL implementation: schema, seeded test data, ETL with DQ gates
+- [x] Automated test suite: 24 assertions across 7 categories
+- [x] CI pipeline (GitHub Actions) — every push is tested
+- [ ] Live dashboard (GitHub Pages)
+
+## Data Quality & CI
+
+Every push to this repository triggers GitHub Actions to spin up a **fresh PostgreSQL 15 container**, build the star schema, run the self-verifying data load (14 sections, each printing counts), and execute the **24-assertion DQ test suite** (structure, volume, lineage, distribution, DQ gates, business rules, and the business story itself). Any SQL error or failed assertion fails the build.
+
+Among the assertions are distribution guards (T08/T10/T12) that encode a real defect found and fixed during development: PostgreSQL evaluates `random()` inside an *uncorrelated* subquery in `FROM` **once per query**, which silently degenerated every distribution in the first data version. The test suite now makes that class of failure impossible to miss.
 
 ## Data Model
 
@@ -109,38 +149,38 @@ erDiagram
     DIM_DATE     ||--o{ FCT_CLAIM_STATUS_SNAPSHOT : "snapshot date"
 ```
 
+## Quick Start
 
-Business Case
+Requires PostgreSQL 14+ (e.g. a free [Neon](https://neon.tech) project) and `psql`.
 
-A mid-size insurer processes claims across 3 legacy systems. Monthly reportingcosts 5 person-days, claim aging is invisible, and the regulator requires proofof claim-decision turnaround times. This project delivers the full analysis anddesign, plus a working, CI-tested implementation.
+```bash
+export DB_URL='postgresql://user:password@host/dbname?sslmode=require'
 
-Objective	Target
-Reporting effort	5 days → < 0.5 days (automation)
-Backlog transparency	Daily aging dashboard
-Claim cycle time	−20% within 12 months
-Regulatory TAT evidence	100% traceable decisions
-Payment accuracy	Paid ≤ approved, violations flagged
+# 1. Create the schema (tables, constraints, indexes, dim_date)
+psql "$DB_URL" -f 04-implementation/sql/schema/schema.sql
 
+# 2. Generate the synthetic legacy source + run the ETL (self-verifying, ~3 min)
+psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/data/run_full_load.sql
 
-Deliverables
- Business Requirements Document (BRD) with prioritized requirements
- As-Is / To-Be process models (BPMN)
- Functional specification for the reporting solution
- KPI catalog & report specifications
- Logical data model (star schema)
- Source-to-target mapping & data quality rules
- SQL implementation: schema, seeded test data, DQ tests, KPI queries
- CI pipeline (GitHub Actions) — every push is automatically tested
- Live dashboard (GitHub Pages)
+# 3. Run the automated DQ test suite (24 assertions, CI-compatible)
+psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/tests/dq_test_suite.sql
+```
 
+## Repository Structure
 
-Tech Stack
-PostgreSQL · GitHub Actions · GitHub Pages · Mermaid / BPMN · Chart.js
+```
+claims-benefits-reporting-ba/
+├── .github/workflows/ci.yml           ← CI: fresh DB → schema → load → 24 tests
+├── 01-business-analysis/              ← BRD, use cases (in progress)
+├── 02-functional-spec/                ← FRS, KPI catalog (in progress)
+├── 03-data-design/
+│   └── logical-data-model.md          ← star schema + design decisions
+└── 04-implementation/sql/
+    ├── schema/schema.sql              ← DDL, constraints, indexes, dim_date
+    ├── data/run_full_load.sql         ← seeded source + ETL, self-verifying
+    └── tests/dq_test_suite.sql        ← 24 automated DQ assertions
+```
 
+## Tech Stack
 
-Quick Start
-
-Requires PostgreSQL 14+ (e.g. a free Neon project) and psql.
-
-export DB_URL='postgresql://user:password@host/dbname?sslmode=require'# 1. Create the schema (tables, constraints, indexes, dim_date)psql "$DB_URL" -f 04-implementation/sql/schema/schema.sql# 2. Generate the synthetic legacy source + run the ETL (self-verifying, ~3 min)psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/data/run_full_load.sql# 3. Run the automated DQ test suite (24 assertions, CI-compatible)psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/tests/dq_test_suite.sql
-All data is synthetic and reproducible (seeded random) — GDPR-safe.
+`PostgreSQL` · `GitHub Actions` · `GitHub Pages` · `Mermaid / BPMN` · `Chart.js`
