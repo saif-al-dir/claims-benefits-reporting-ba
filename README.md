@@ -1,5 +1,6 @@
-🏥 Insurance Claims & Benefits — Business Analysis to Reporting Solution
+# 🏥 Insurance Claims & Benefits — Business Analysis to Reporting Solution
 
+badge visible on your README
 
 End-to-end business analysis project: from business requirements analysis andBPMN process modeling, through functional specification and data warehousedesign, to a tested and automatically deployed KPI reporting solution.
 
