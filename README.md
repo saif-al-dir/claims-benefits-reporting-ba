@@ -1,8 +1,6 @@
 # 🏥 Insurance Claims & Benefits — Business Analysis to Reporting Solution
 
-CI — Data Pipeline | passing ✅
-
-- [x] CI pipeline (GitHub Actions) — every push is automatically tested
+[![CI — Data Pipeline](https://github.com/saif-al-dir/claims-benefits-reporting-ba/actions/workflows/ci.yml/badge.svg)](https://github.com/saif-al-dir/claims-benefits-reporting-ba/actions/workflows/ci.yml)
 
 End-to-end business analysis project: from business requirements analysis andBPMN process modeling, through functional specification and data warehousedesign, to a tested and automatically deployed KPI reporting solution.
 
