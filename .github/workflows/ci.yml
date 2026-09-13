@@ -46,5 +46,6 @@ jobs:
 
       - name: Run DQ test suite (24 assertions)
         run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/tests/dq_test_suite.sql
+        
       - name: KPI query library smoke run (analysis layer must execute cleanly)
         run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/queries/kpi_queries.sql
