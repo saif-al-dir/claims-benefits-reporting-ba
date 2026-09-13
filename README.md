@@ -30,7 +30,7 @@ A mid-size insurer processes claims across 3 legacy systems. Monthly reporting c
 ## Deliverables
 
 - [x] Business Requirements Document (BRD) with prioritized requirements
-- [ ] As-Is / To-Be process models (BPMN)
+- [x] As-Is / To-Be process models (BPMN)
 - [x] Functional specification for the reporting solution
 - [x] KPI catalog & report specifications
 - [x] Logical data model (star schema)
@@ -171,7 +171,7 @@ psql "$DB_URL" -v ON_ERROR_STOP=1 -f 04-implementation/sql/tests/dq_test_suite.s
 ```
 claims-benefits-reporting-ba/
 ├── .github/workflows/ci.yml           ← CI: fresh DB → schema → load → 24 tests
-├── 01-business-analysis/              ← BRD, use cases
+├── 01-business-analysis/              ← BRD, use cases, as-is/to-be process models
 ├── 02-functional-spec/                ← FRS, KPI catalog
 ├── 03-data-design/
 │   └── logical-data-model.md          ← star schema + design decisions
