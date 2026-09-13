@@ -2,6 +2,8 @@
 
 [![CI — Data Pipeline](https://github.com/saif-al-dir/claims-benefits-reporting-ba/actions/workflows/ci.yml/badge.svg)](https://github.com/saif-al-dir/claims-benefits-reporting-ba/actions/workflows/ci.yml)
 
+**🌐 Live dashboard:** [saif-al-dir.github.io/claims-benefits-reporting-ba](https://saif-al-dir.github.io/claims-benefits-reporting-ba/)
+
 End-to-end business analysis project: from business requirements analysis and BPMN process modeling, through functional specification and data warehouse design, to a **tested and CI-verified KPI reporting solution**.
 
 > ⚠️ Fictional case study ("NovaCare Insurance"). All data is synthetic and reproducible (seeded) — GDPR-safe.
@@ -38,7 +40,7 @@ A mid-size insurer processes claims across 3 legacy systems. Monthly reporting c
 - [x] SQL implementation: schema, seeded test data, ETL with DQ gates
 - [x] Automated test suite: 24 assertions across 7 categories
 - [x] CI pipeline (GitHub Actions) — every push is tested
-- [ ] Live dashboard (GitHub Pages)
+- [x] Live dashboard (GitHub Pages)
 
 ## Data Quality & CI
 
@@ -176,9 +178,10 @@ claims-benefits-reporting-ba/
 ├── 03-data-design/
 │   └── logical-data-model.md          ← star schema + design decisions
 └── 04-implementation/sql/
-    ├── schema/schema.sql              ← DDL, constraints, indexes, dim_date
-    ├── data/run_full_load.sql         ← seeded source + ETL, self-verifying
-    └── tests/dq_test_suite.sql        ← 24 automated DQ assertions
+|   ├── schema/schema.sql              ← DDL, constraints, indexes, dim_date
+|   ├── data/run_full_load.sql         ← seeded source + ETL, self-verifying
+|   └── tests/dq_test_suite.sql        ← 24 automated DQ assertions
+├── 05-dashboard/                      ← live KPI dashboard (GitHub Pages)
 ```
 
 ## Tech Stack
