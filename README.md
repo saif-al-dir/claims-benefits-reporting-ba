@@ -29,7 +29,7 @@ A mid-size insurer processes claims across 3 legacy systems. Monthly reporting c
 
 ## Deliverables
 
-- [ ] Business Requirements Document (BRD) with prioritized requirements
+- [x] Business Requirements Document (BRD) with prioritized requirements
 - [ ] As-Is / To-Be process models (BPMN)
 - [ ] Functional specification for the reporting solution
 - [ ] KPI catalog & report specifications
