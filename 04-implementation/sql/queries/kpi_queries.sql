@@ -180,4 +180,20 @@ JOIN dim_date  dd ON dd.date_key  = fc.fnol_date_key
 GROUP BY dd.year, dc.intake_channel
 ORDER BY dd.year, share_pct DESC;
 
+-- ────────────────────────────────────────────────────────────────────────────
+-- Q9 | KPI-06 · Payment leakage totals (count + EUR). Small count, large
+--    money: ~0.2% of claims but €650K exposure — why the KPI is EUR-based.
+-- ────────────────────────────────────────────────────────────────────────────
+WITH paid AS (
+    SELECT claim_sk, SUM(payment_amount) AS total_paid
+    FROM fct_payment GROUP BY claim_sk
+)
+SELECT COUNT(*) AS leakage_claims,
+       ROUND(SUM(paid.total_paid - fc.approved_benefit_amount), 2) AS total_overpayment_eur,
+       ROUND(AVG(paid.total_paid - fc.approved_benefit_amount), 2) AS avg_overpayment_eur
+FROM fct_claim fc
+JOIN paid ON paid.claim_sk = fc.claim_sk
+WHERE fc.approved_benefit_amount IS NOT NULL
+  AND paid.total_paid > fc.approved_benefit_amount;
+
 -- [KPI LIBRARY v1.0 — END OF FILE]
