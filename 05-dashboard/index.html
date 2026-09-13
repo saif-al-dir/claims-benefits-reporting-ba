@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claims Cockpit — NovaCare Insurance (Portfolio)</title>
+<meta name="description" content="Claims & benefits KPI dashboard: SLA compliance, cycle time P90, backlog aging, payment leakage, data quality. Portfolio project — synthetic data.">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f1f5f9;--card:#fff;
+--blue:#2563eb;--teal:#0d9488;--red:#dc2626;--amber:#d97706;--green:#16a34a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+header{background:#0f172a;color:#fff;padding:26px 0 24px}
+h1{font-size:1.55rem}
+.sub{color:#94a3b8;margin-top:4px;font-size:.95rem}
+.pill{display:inline-block;background:#7c2d12;color:#fed7aa;font-size:.75rem;padding:3px 10px;border-radius:999px;margin-top:10px;font-weight:600}
+.head-links{margin-top:12px;font-size:.85rem}
+.head-links a{color:#93c5fd;text-decoration:none;margin-right:16px}
+.head-links img{vertical-align:middle;height:18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin:22px 0}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 17px;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.kpi .v{font-size:1.65rem;font-weight:700}
+.kpi .l{font-size:.83rem;color:var(--muted);margin-top:2px}
+.kpi .s{font-size:.74rem;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--muted)}
+.kpi.red .v{color:var(--red)}.kpi.amber .v{color:var(--amber)}.kpi.green .v{color:var(--green)}.kpi.blue .v{color:var(--blue)}
+h2.sec{margin:26px 0 12px;font-size:1.12rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
+.chart-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.chart-card h3{font-size:.98rem}
+.chart-card .note{font-size:.78rem;color:var(--muted);margin:3px 0 10px}
+.chart-box{position:relative;height:290px}
+.insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:14px;margin-top:4px}
+.insight{background:#fff;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:8px;padding:13px 15px}
+.insight h4{font-size:.92rem;margin-bottom:5px}
+.insight p{font-size:.83rem;color:#334155}
+footer{background:#0f172a;color:#94a3b8;padding:22px 0;margin-top:30px;font-size:.82rem}
+footer code{background:#1e293b;color:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:.76rem}
+footer a{color:#93c5fd}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>🏥 Claims Cockpit — NovaCare Insurance</h1>
+    <div class="sub">Claims &amp; Benefits KPI reporting · Jan 2022 – Dec 2024 · 149,152 claims · 187,512 payments · portfolio project by Saif</div>
+    <div class="pill">⚠ Fictional case study — synthetic, seeded data (GDPR-safe)</div>
+    <div class="head-links">
+      <a href="https://github.com/saif-al-dir/claims-benefits-reporting-ba/actions/workflows/ci.yml"><img src="https://github.com/saif-al-dir/claims-benefits-reporting-ba/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+      <a href="https://github.com/saif-al-dir/claims-benefits-reporting-ba">📦 Source repository</a>
+      <a href="https://github.com/saif-al-dir/claims-benefits-reporting-ba/blob/main/01-business-analysis/BRD.md">BRD</a>
+      <a href="https://github.com/saif-al-dir/claims-benefits-reporting-ba/blob/main/02-functional-spec/FRS.md">FRS</a>
+      <a href="https://github.com/saif-al-dir/claims-benefits-reporting-ba/blob/main/02-functional-spec/kpi-catalog.md">KPI catalog</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="kpis">
+    <div class="kpi blue"><div class="v">78.2%</div><div class="l">Disability SLA compliance · 2024</div><div class="s">Target ≥95% · 75.2 → 78.2 over three years — stuck</div></div>
+    <div class="kpi red"><div class="v">49 d</div><div class="l">Disability P90 cycle time</div><div class="s">vs 21-day SLA — 1 claimant in 10 waits 2.3× the promise</div></div>
+    <div class="kpi amber"><div class="v">6,814</div><div class="l">Open claims · YE 2024</div><div class="s">1,168 older than 180 days — the tail never drains</div></div>
+    <div class="kpi red"><div class="v">€650K</div><div class="l">Payment leakage</div><div class="s">339 claims · avg €1,918 · flagged for recovery</div></div>
+    <div class="kpi green"><div class="v">94.7%</div><div class="l">First-pass ratio</div><div class="s">Target ≥85% · reopen rate 5.3% (target ≤5%, marginal)</div></div>
+    <div class="kpi green"><div class="v">55%</div><div class="l">Portal intake share · 2024</div><div class="s">24.5% → 39.9% → 55.0% — digitalization working</div></div>
+  </section>
+
+  <h2 class="sec">Performance &amp; Service</h2>
+  <section class="grid">
+    <div class="chart-card" style="grid-column:1/-1">
+      <h3>SLA Compliance by Line of Business (monthly)</h3>
+      <div class="note">Decision-based, product SLA · dashed line = 95% target · 2022-01/02 excluded (window-boundary artifact, see FRS §10)</div>
+      <div class="chart-box"><canvas id="cSla"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Cycle Time 2024 — Average vs P90 vs SLA</h3>
+      <div class="note">The mean hides the tail: Disability's average sits at its SLA, its P90 is 2.3×</div>
+      <div class="chart-box"><canvas id="cCycle"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Open Backlog Trend (month-end)</h3>
+      <div class="note">Total open pipeline incl. decided-awaiting-closure · 180+ tail grows monotonically</div>
+      <div class="chart-box"><canvas id="cBacklog"></canvas></div>
+    </div>
+  </section>
+
+  <h2 class="sec">Operations &amp; Data Quality</h2>
+  <section class="grid">
+    <div class="chart-card">
+      <h3>Intake Channel Mix by Year</h3>
+      <div class="note">Share of new claims · portal adoption 24.5% → 55.0%</div>
+      <div class="chart-box"><canvas id="cChannel"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>SLA Compliance by Team</h3>
+      <div class="note">Team Delta = Disability · all 8 handlers within 1.4 points — the gap is structural, not individual</div>
+      <div class="chart-box"><canvas id="cTeam"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Data Quality Gates — Reference Load</h3>
+      <div class="note">Every rejection logged with evidence · 24/24 automated assertions pass in CI</div>
+      <div class="chart-box"><canvas id="cDq"></canvas></div>
+    </div>
+  </section>
+
+  <h2 class="sec">Key Findings</h2>
+  <section class="insights">
+    <div class="insight"><h4>📉 The mean hides the tail</h4><p>Disability's average cycle time (19.8 d) sits at its 21-day SLA — but the P90 is 49 days. Reported on averages alone, the exposure is invisible.</p></div>
+    <div class="insight" style="border-left-color:var(--red)"><h4>🔧 The Disability gap is structural</h4><p>All Team Delta handlers score 76.0–77.4% SLA while every other handler is ≥91.8% at comparable workload. The driver is SLA calibration and process design — not people.</p></div>
+    <div class="insight" style="border-left-color:var(--amber)"><h4>💶 Small count, large money</h4><p>339 overpaid claims are 0.23% of volume — but €650,236 of exposure. KPI-06 is deliberately EUR-based: a count-based control would call this negligible.</p></div>
+    <div class="insight" style="border-left-color:var(--green)"><h4>🧪 Data quality is measured, not assumed</h4><p>Every load runs three gates (45 critical rejections, 40 duplicates, 261 unknown-handler defaults — all logged) and 24 CI assertions; a degenerate dataset fails the build.</p></div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><strong>Methodology.</strong> Figures come from this repository's CI-tested pipeline: seeded synthetic legacy source (149,237 records) → ETL with DQ gates → star schema → KPI query library (Q1–Q9). Reference figures: 339 leakage claims · €650,236.22 · Disability P90 49 d vs 21-day SLA.</p>
+    <p style="margin-top:8px">Reproduce: <code>psql "$DB_URL" -f schema.sql</code> · <code>run_full_load.sql</code> · <code>kpi_queries.sql</code> — full instructions in the <a href="https://github.com/saif-al-dir/claims-benefits-reporting-ba">repository README</a>. Data is fictional and reproducible — not market benchmarks.</p>
+  </div>
+</footer>
+
+<script src="data.js"></script>
+<script>
+const C = { health:'#2563eb', accident:'#0d9488', disability:'#dc2626', target:'#94a3b8' };
+Chart.defaults.font.family = "'Segoe UI',system-ui,sans-serif";
+Chart.defaults.color = '#475569';
+
+new Chart(document.getElementById('cSla'), {
+  type: 'line',
+  data: { labels: D.slaMonthly.months, datasets: [
+    { label:'Health',     data:D.slaMonthly.health,     borderColor:C.health,     backgroundColor:C.health,     pointRadius:0, borderWidth:2,   tension:.25 },
+    { label:'Accident',   data:D.slaMonthly.accident,   borderColor:C.accident,   backgroundColor:C.accident,   pointRadius:0, borderWidth:2,   tension:.25 },
+    { label:'Disability', data:D.slaMonthly.disability, borderColor:C.disability, backgroundColor:C.disability, pointRadius:0, borderWidth:2.5, tension:.25 },
+    { label:'Target 95%', data:D.slaMonthly.months.map(()=>95), borderColor:C.target, borderDash:[6,5], borderWidth:1.5, pointRadius:0 }
+  ]},
+  options: { responsive:true, maintainAspectRatio:false,
+    interaction:{ mode:'index', intersect:false },
+    plugins:{ legend:{ position:'bottom' } },
+    scales:{ y:{ min:60, max:100, title:{display:true, text:'SLA compliance %'} },
+             x:{ ticks:{ maxTicksLimit:12 } } } }
+});
+
+new Chart(document.getElementById('cCycle'), {
+  type: 'bar',
+  data: { labels: D.cycle2024.lobs, datasets: [
+    { label:'Average (days)', data:D.cycle2024.avg, backgroundColor:'#60a5fa', borderRadius:4 },
+    { label:'P90 (days)',     data:D.cycle2024.p90, backgroundColor:'#1e3a8a', borderRadius:4 },
+    { label:'Product SLA (days)', data:D.cycle2024.sla, backgroundColor:'#cbd5e1', borderRadius:4 }
+  ]},
+  options: { responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ position:'bottom' } },
+    scales:{ y:{ beginAtZero:true, title:{display:true, text:'days'} } } }
+});
+
+new Chart(document.getElementById('cBacklog'), {
+  type: 'line',
+  data: { labels: D.backlog.months, datasets: [
+    { label:'Open claims',  data:D.backlog.open,    borderColor:C.health, backgroundColor:'rgba(37,99,235,.10)', fill:true, pointRadius:0, borderWidth:2, tension:.2 },
+    { label:'Open > 90 d',  data:D.backlog.over90,  borderColor:'#d97706', backgroundColor:'#d97706', pointRadius:0, borderWidth:2, tension:.2 },
+    { label:'Open > 180 d', data:D.backlog.over180, borderColor:C.disability, backgroundColor:C.disability, pointRadius:0, borderWidth:2, tension:.2 }
+  ]},
+  options: { responsive:true, maintainAspectRatio:false,
+    interaction:{ mode:'index', intersect:false },
+    plugins:{ legend:{ position:'bottom' } },
+    scales:{ y:{ beginAtZero:true, title:{display:true, text:'claims'} },
+             x:{ ticks:{ maxTicksLimit:12 } } } }
+});
+
+new Chart(document.getElementById('cChannel'), {
+  type: 'bar',
+  data: { labels: D.channels.years, datasets: [
+    { label:'Portal', data:D.channels.portal, backgroundColor:'#16a34a' },
+    { label:'Phone',  data:D.channels.phone,  backgroundColor:'#2563eb' },
+    { label:'Email',  data:D.channels.email,  backgroundColor:'#94a3b8' },
+    { label:'Broker', data:D.channels.broker, backgroundColor:'#d97706' }
+  ]},
+  options: { responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ position:'bottom' } },
+    scales:{ x:{ stacked:true }, y:{ stacked:true, max:100, title:{display:true, text:'% of new claims'} } } }
+});
+
+new Chart(document.getElementById('cTeam'), {
+  data: { labels: D.teams.names, datasets: [
+    { type:'bar',  label:'Team average SLA %', data:D.teams.sla,
+      backgroundColor:['#2563eb','#2563eb','#0d9488','#dc2626'], borderRadius:4 },
+    { type:'line', label:'Target 95%', data:[95,95,95,95],
+      borderColor:C.target, borderDash:[6,5], borderWidth:1.5, pointRadius:0 }
+  ]},
+  options: { responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ position:'bottom' } },
+    scales:{ y:{ min:60, max:100, title:{display:true, text:'SLA compliance %'} } } }
+});
+
+new Chart(document.getElementById('cDq'), {
+  type: 'bar',
+  data: { labels: ['E1 · Critical rejections', 'E2 · Duplicates removed', 'E3 · Unknown handlers defaulted'],
+          datasets: [{ label:'Rows per reference load',
+                       data:[D.dq.critical, D.dq.duplicates, D.dq.unknownHandlers],
+                       backgroundColor:['#dc2626','#d97706','#eab308'], borderRadius:4 }]},
+  options: { indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false } },
+    scales:{ x:{ beginAtZero:true, title:{display:true, text:'rows'} } } }
+});
+</script>
+</body>
+</html>
